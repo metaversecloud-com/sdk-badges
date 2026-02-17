@@ -32,7 +32,10 @@ export const awardBadge = async ({
     if (!inventoryItem) throw new Error(`Badge "${badgeName}" not found in ecosystem inventory`);
 
     try {
-      const recipientUser = await User.create({ credentials: { ...credentials, profileId: recipientProfileId } });
+      const recipientUser = await User.create({
+        profileId: recipientProfileId,
+        credentials: { ...credentials, profileId: recipientProfileId },
+      });
       const recipientVisitor = await Visitor.create(recipientVisitorId, urlSlug, { credentials });
 
       // Grant the badge

@@ -10,7 +10,6 @@ Allow admins to award badges to visitors currently in a world. Allow visitors to
 
 1. Click on a dropped asset in world to open this app in an iframe
 2. View all badges (read only) - if the visitor has the badge in their inventory it should be in full color, otherwise it'll be grayscale
-   {"sortOrder":0}
 
 ## 3. Core Admin Flow
 
