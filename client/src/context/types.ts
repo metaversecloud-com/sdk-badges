@@ -19,12 +19,33 @@ export type InteractiveParams = {
   visitorId: string;
 };
 
+export type BadgeType = {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+};
+
+export type VisitorInventoryType = {
+  badges: { [name: string]: { id: string; name: string; icon: string } };
+};
+
+export type CurrentVisitor = {
+  visitorId: number;
+  profileId: string;
+  displayName: string;
+  username: string;
+};
+
 export interface InitialState {
   isAdmin?: boolean;
   error?: string;
   hasInteractiveParams?: boolean;
   visitorData?: VisitorDataObject;
   droppedAsset?: DroppedAssetInterface;
+  badges?: { [name: string]: BadgeType };
+  visitorInventory?: VisitorInventoryType;
+  currentVisitors?: CurrentVisitor[];
 }
 
 export type ActionType = {

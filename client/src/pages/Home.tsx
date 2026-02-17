@@ -1,21 +1,27 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 
 // components
-import { PageContainer } from "@/components";
+import { AwardBadgeModal, PageContainer } from "@/components";
 
 // context
 import { GlobalDispatchContext, GlobalStateContext } from "@/context/GlobalContext";
-import { ErrorType } from "@/context/types";
+import { BadgeType, CurrentVisitor, ErrorType } from "@/context/types";
 
 // utils
 import { backendAPI, setErrorMessage, setGameState } from "@/utils";
 
 export const Home = () => {
   const dispatch = useContext(GlobalDispatchContext);
-  const { droppedAsset, hasInteractiveParams } = useContext(GlobalStateContext);
-  const imgSrc = droppedAsset?.topLayerURL || droppedAsset?.bottomLayerURL;
+  const { badges, currentVisitors, hasInteractiveParams, isAdmin, visitorInventory } = useContext(GlobalStateContext);
 
   const [isLoading, setIsLoading] = useState(true);
+
+  // Admin-only state
+  const [selectedVisitor, setSelectedVisitor] = useState<CurrentVisitor | null>(null);
+  const [selectedBadge, setSelectedBadge] = useState<string | null>(null);
+  const [showAwardModal, setShowAwardModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [awardSuccess, setAwardSuccess] = useState<{ badgeName: string; displayName: string } | null>(null);
 
   useEffect(() => {
     if (hasInteractiveParams) {
@@ -29,15 +35,139 @@ export const Home = () => {
     }
   }, [hasInteractiveParams]);
 
+  const filteredVisitors = useMemo(() => {
+    if (!currentVisitors) return [];
+    if (!searchTerm.trim()) return currentVisitors;
+    const term = searchTerm.toLowerCase();
+    return currentVisitors.filter((v) => v.displayName.toLowerCase().includes(term));
+  }, [currentVisitors, searchTerm]);
+
+  const handleAwardClick = () => {
+    if (selectedVisitor && selectedBadge) {
+      setShowAwardModal(true);
+    }
+  };
+
+  const handleConfirmAward = async (comment: string) => {
+    if (!selectedVisitor || !selectedBadge) return;
+
+    try {
+      const response = await backendAPI.post("/award-badge", {
+        recipientVisitorId: selectedVisitor.visitorId,
+        recipientProfileId: selectedVisitor.profileId,
+        recipientDisplayName: selectedVisitor.displayName,
+        badgeName: selectedBadge,
+        comment,
+      });
+
+      if (response.data.alreadyOwned) {
+        setErrorMessage(dispatch, `${selectedVisitor.displayName} already has the ${selectedBadge} badge.`);
+      } else {
+        setAwardSuccess({ badgeName: selectedBadge, displayName: selectedVisitor.displayName });
+        setTimeout(() => setAwardSuccess(null), 3000);
+      }
+
+      // Refresh game state to get updated inventory
+      const refreshResponse = await backendAPI.get("/game-state");
+      setGameState(dispatch, refreshResponse.data);
+    } catch (error) {
+      setErrorMessage(dispatch, error as ErrorType);
+    } finally {
+      setShowAwardModal(false);
+      setSelectedBadge(null);
+      setSelectedVisitor(null);
+    }
+  };
+
+  const badgeList = badges ? Object.values(badges) : [];
+
   return (
-    <PageContainer isLoading={isLoading} headerText="Server side example using interactive parameters">
-      {droppedAsset?.id && (
-        <div className="flex flex-col w-full items-start">
-          <p className="mt-4 mb-2">
-            You have successfully retrieved the dropped asset details for {droppedAsset.assetName}!
+    <PageContainer isLoading={isLoading} headerText="Badges">
+      {/* Award success animation */}
+      {awardSuccess && (
+        <div className="award-success-banner award-success">
+          <p className="p1 text-success">
+            Awarded {awardSuccess.badgeName} to {awardSuccess.displayName}!
           </p>
-          {imgSrc && <img className="w-96 h-96 object-cover rounded-2xl my-4" alt="preview" src={imgSrc} />}
         </div>
+      )}
+
+      {/* Admin Section: Visitor List */}
+      {isAdmin && (
+        <div className="mb-6">
+          <h3 className="h3 py-3">Current Visitors</h3>
+          <div className="input-group mb-2">
+            <input
+              className="input"
+              type="text"
+              placeholder="Search visitors..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+            {filteredVisitors.length === 0 ? (
+              <p className="p3 text-muted text-center">No visitors found.</p>
+            ) : (
+              <table className="table">
+                <tbody>
+                  {filteredVisitors.map((visitor) => (
+                    <tr
+                      key={visitor.visitorId}
+                      className={`visitor-item ${selectedVisitor?.visitorId === visitor.visitorId ? "selected" : ""}`}
+                      onClick={() => setSelectedVisitor(visitor)}
+                    >
+                      <td className="p2">{visitor.displayName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Badges Grid */}
+      <h3 className="h3 py-3">{isAdmin ? "Select a Badge to Award" : ""}</h3>
+      {badgeList.length === 0 ? (
+        <div className="text-center py-4">
+          <p className="p2 text-muted">No badges available yet.</p>
+        </div>
+      ) : (
+        <div className="grid badge-grid">
+          {badgeList.map((badge: BadgeType) => {
+            const hasBadge = visitorInventory?.badges && badge.name in visitorInventory.badges;
+            const isSelected = isAdmin && selectedBadge === badge.name;
+
+            return (
+              <div
+                key={badge.name}
+                className={`tooltip ${isAdmin ? "selectable" : ""} ${isSelected ? "selected" : ""}`}
+                onClick={() => isAdmin && setSelectedBadge(badge.name)}
+              >
+                <span className="tooltip-content">{badge.description || badge.name}</span>
+                <img src={badge.icon} alt={badge.name} className={hasBadge || isAdmin ? "" : "badge-img-grayscale"} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Admin: Award Button */}
+      {isAdmin && (
+        <button className="btn mt-4" disabled={!selectedVisitor || !selectedBadge} onClick={handleAwardClick}>
+          Award Badge
+        </button>
+      )}
+
+      {/* Award Confirmation Modal */}
+      {showAwardModal && selectedVisitor && selectedBadge && (
+        <AwardBadgeModal
+          badgeName={selectedBadge}
+          displayName={selectedVisitor.displayName}
+          onConfirm={handleConfirmAward}
+          onCancel={() => setShowAwardModal(false)}
+        />
       )}
     </PageContainer>
   );

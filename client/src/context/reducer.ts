@@ -14,6 +14,9 @@ const globalReducer = (state: InitialState, action: ActionType) => {
         isAdmin: payload.isAdmin,
         visitorData: payload.visitorData,
         droppedAsset: payload.droppedAsset,
+        badges: payload.badges,
+        visitorInventory: payload.visitorInventory,
+        currentVisitors: payload.currentVisitors,
         error: "",
       };
     case SET_ERROR:

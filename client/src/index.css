@@ -1,3 +1,104 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Animated gradient background */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+body {
+  background: linear-gradient(-45deg, #fdf0ed, #fce4ec, #e3f2fd, #e0f7f0);
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+  min-height: 100vh;
+}
+
+/* Award success celebration */
+@keyframes award-celebrate {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  15% {
+    transform: scale(1.15);
+  }
+  30% {
+    transform: scale(0.95);
+  }
+  45% {
+    transform: scale(1.05);
+  }
+  60% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes award-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.award-success {
+  animation: award-celebrate 0.8s ease-out;
+}
+
+.award-success-banner {
+  background: linear-gradient(90deg, transparent, rgba(76, 175, 80, 0.15), transparent);
+  background-size: 200% 100%;
+  animation: award-shimmer 1.5s ease-out;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+/* Badge grid layout */
+.badge-grid {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+/* Badge item */
+.badge-grid .selectable {
+  cursor: pointer;
+}
+
+.badge-grid .selectable:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.badge-grid .selected {
+  outline: 2px solid #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.badge-img-grayscale {
+  filter: grayscale(1);
+}
+
+/* Visitor list items */
+.visitor-item {
+  cursor: pointer;
+  margin: 2px;
+}
+
+.visitor-item.selected {
+  background: rgba(76, 175, 80, 0.1);
+}
