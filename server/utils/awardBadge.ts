@@ -32,7 +32,7 @@ export const awardBadge = async ({
     if (!inventoryItem) throw new Error(`Badge "${badgeName}" not found in ecosystem inventory`);
 
     try {
-      const recipientUser = await User.create({ credentials: { ...credentials, profileId: recipientProfileId } });
+      const recipientUser = await User.create({ profileId: recipientProfileId, credentials: { ...credentials, profileId: recipientProfileId } });
       const recipientVisitor = await Visitor.create(recipientVisitorId, urlSlug, { credentials });
 
       // Grant the badge
@@ -52,7 +52,7 @@ export const awardBadge = async ({
         .triggerParticle({ name: "confetti_1", duration: 4 })
         .catch(() => console.error(`Failed to trigger particles for ${badgeName} badge`));
     } catch (error) {
-      console.error(standardizeError(error));
+      throw error;
     }
 
     // Track award in admin's visitor data object
