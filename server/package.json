@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "dev": "npx tsx watch index.ts",
-    "start": "node dist/index.js",
+    "start": "node dist/server/index.js",
     "build": "npx tsc",
     "link-sdk": "yalc link @rtsdk/topia",
     "unlink-sdk": "yalc remove @rtsdk/topia",
