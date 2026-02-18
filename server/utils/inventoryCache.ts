@@ -46,7 +46,10 @@ export const getCachedInventoryItems = async ({
           ...item,
           metadata: {
             ...(item.metadata || {}),
-            sortOrder: typeof item.metadata?.sortOrder === "number" ? item.metadata.sortOrder : 0,
+            sortOrder:
+              typeof (item.metadata as { sortOrder?: number })?.sortOrder === "number"
+                ? (item.metadata as { sortOrder?: number }).sortOrder
+                : 0,
           },
         }))
         .sort((a, b) => {
