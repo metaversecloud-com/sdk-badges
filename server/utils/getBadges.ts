@@ -14,8 +14,8 @@ export type BadgeRecord = {
  * Get all active badges from ecosystem inventory.
  * Uses cached inventory items for performance.
  */
-export const getBadges = async (credentials: Credentials): Promise<BadgeRecord> => {
-  const inventoryItems = await getCachedInventoryItems({ credentials });
+export const getBadges = async (credentials: Credentials, forceRefresh: boolean): Promise<BadgeRecord> => {
+  const inventoryItems = await getCachedInventoryItems({ credentials, forceRefresh });
 
   const badges: BadgeRecord = {};
 

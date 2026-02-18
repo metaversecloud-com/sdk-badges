@@ -6,14 +6,14 @@ export const handleGetGameState = async (req: Request, res: Response) => {
   try {
     const credentials = getCredentials(req.query);
     const { urlSlug, visitorId } = credentials;
+    const forceRefresh = req.query.forceRefreshInventory === "true";
 
     // Fetch visitor for admin status
     const visitor: VisitorInterface = await Visitor.get(visitorId, urlSlug, { credentials });
     const { isAdmin } = visitor;
 
     // Fetch badges and visitor inventory in parallel
-    const [badges] = await Promise.all([getBadges(credentials), visitor.fetchInventoryItems()]);
-
+    const [badges] = await Promise.all([getBadges(credentials, forceRefresh), visitor.fetchInventoryItems()]);
     const visitorInventory = getVisitorBadges(visitor.inventoryItems);
 
     const responseData: Record<string, any> = {
