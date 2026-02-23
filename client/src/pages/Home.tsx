@@ -25,6 +25,7 @@ export const Home = () => {
   const [selectedBadge, setSelectedBadge] = useState<string | null>(null);
   const [showAwardModal, setShowAwardModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [badgeSearchTerm, setBadgeSearchTerm] = useState("");
   const [awardSuccess, setAwardSuccess] = useState<{ badgeName: string; displayName: string } | null>(null);
 
   useEffect(() => {
@@ -83,7 +84,13 @@ export const Home = () => {
     }
   };
 
-  const badgeList = badges ? Object.values(badges) : [];
+  const badgeList = useMemo(() => (badges ? Object.values(badges) : []), [badges]);
+
+  const filteredBadges = useMemo(() => {
+    if (!isAdmin || !badgeSearchTerm.trim()) return badgeList;
+    const term = badgeSearchTerm.toLowerCase();
+    return badgeList.filter((b) => b.name.toLowerCase().includes(term));
+  }, [badgeList, badgeSearchTerm, isAdmin]);
 
   return (
     <PageContainer isLoading={isLoading} headerText="Badges">
@@ -133,13 +140,24 @@ export const Home = () => {
 
       {/* Badges Grid */}
       <h3 className="h3 py-3">{isAdmin ? "Select a Badge to Award" : ""}</h3>
-      {badgeList.length === 0 ? (
+      {isAdmin && (
+        <div className="input-group mb-2">
+          <input
+            className="input"
+            type="text"
+            placeholder="Search badges..."
+            value={badgeSearchTerm}
+            onChange={(e) => setBadgeSearchTerm(e.target.value)}
+          />
+        </div>
+      )}
+      {filteredBadges.length === 0 ? (
         <div className="text-center py-4">
           <p className="p2 text-muted">No badges available yet.</p>
         </div>
       ) : (
         <div className="grid badge-grid">
-          {badgeList.map((badge: BadgeType) => {
+          {filteredBadges.map((badge: BadgeType) => {
             const hasBadge = visitorInventory?.badges && badge.name in visitorInventory.badges;
             const isSelected = isAdmin && selectedBadge === badge.name;
 
