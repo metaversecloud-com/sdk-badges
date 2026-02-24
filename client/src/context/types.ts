@@ -35,6 +35,7 @@ export type CurrentVisitor = {
   profileId: string;
   displayName: string;
   username: string;
+  isAdmin: boolean;
 };
 
 export interface InitialState {

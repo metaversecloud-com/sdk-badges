@@ -2,12 +2,12 @@ import { useState } from "react";
 
 interface AwardBadgeModalProps {
   badgeName: string;
-  displayName: string;
+  displayNames: string[];
   onConfirm: (comment: string) => void;
   onCancel: () => void;
 }
 
-export const AwardBadgeModal = ({ badgeName, displayName, onConfirm, onCancel }: AwardBadgeModalProps) => {
+export const AwardBadgeModal = ({ badgeName, displayNames, onConfirm, onCancel }: AwardBadgeModalProps) => {
   const [comment, setComment] = useState("");
   const [areButtonsDisabled, setAreButtonsDisabled] = useState(false);
 
@@ -20,7 +20,7 @@ export const AwardBadgeModal = ({ badgeName, displayName, onConfirm, onCancel }:
     <div className="modal-container">
       <div className="modal">
         <h4 className="h4">
-          Award {badgeName} to {displayName}?
+          Award {badgeName} to {displayNames.length === 1 ? displayNames[0] : `${displayNames.length} visitors`}?
         </h4>
         <div className="input-group">
           <label className="label">Comment (optional)</label>

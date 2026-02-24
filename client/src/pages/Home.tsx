@@ -1,8 +1,8 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 // components
-import { AwardBadgeModal, PageContainer } from "@/components";
+import { AwardBadgeModal, PageContainer, PageFooter } from "@/components";
 
 // context
 import { GlobalDispatchContext, GlobalStateContext } from "@/context/GlobalContext";
@@ -21,22 +21,26 @@ export const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Admin-only state
-  const [selectedVisitor, setSelectedVisitor] = useState<CurrentVisitor | null>(null);
+  const [selectedVisitors, setSelectedVisitors] = useState<CurrentVisitor[]>([]);
   const [selectedBadge, setSelectedBadge] = useState<string | null>(null);
   const [showAwardModal, setShowAwardModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [badgeSearchTerm, setBadgeSearchTerm] = useState("");
-  const [awardSuccess, setAwardSuccess] = useState<{ badgeName: string; displayName: string } | null>(null);
+  const [awardSuccess, setAwardSuccess] = useState<{ badgeName: string; displayNames: string } | null>(null);
+
+  const fetchGameState = useCallback(() => {
+    backendAPI
+      .get("/game-state", { params: { forceRefreshInventory } })
+      .then((response) => {
+        setGameState(dispatch, response.data);
+      })
+      .catch((error) => setErrorMessage(dispatch, error as ErrorType))
+      .finally(() => setIsLoading(false));
+  }, [dispatch, forceRefreshInventory]);
 
   useEffect(() => {
     if (hasInteractiveParams) {
-      backendAPI
-        .get("/game-state", { params: { forceRefreshInventory } })
-        .then((response) => {
-          setGameState(dispatch, response.data);
-        })
-        .catch((error) => setErrorMessage(dispatch, error as ErrorType))
-        .finally(() => setIsLoading(false));
+      fetchGameState();
     }
   }, [hasInteractiveParams]);
 
@@ -47,28 +51,37 @@ export const Home = () => {
     return currentVisitors.filter((v) => v.displayName.toLowerCase().includes(term));
   }, [currentVisitors, searchTerm]);
 
+  const toggleVisitor = (visitor: CurrentVisitor) => {
+    setSelectedVisitors((prev) =>
+      prev.some((v) => v.visitorId === visitor.visitorId)
+        ? prev.filter((v) => v.visitorId !== visitor.visitorId)
+        : [...prev, visitor],
+    );
+  };
+
   const handleAwardClick = () => {
-    if (selectedVisitor && selectedBadge) {
+    if (selectedVisitors.length > 0 && selectedBadge) {
       setShowAwardModal(true);
     }
   };
 
   const handleConfirmAward = async (comment: string) => {
-    if (!selectedVisitor || !selectedBadge) return;
+    if (selectedVisitors.length === 0 || !selectedBadge) return;
 
     try {
       const response = await backendAPI.post("/award-badge", {
-        recipientVisitorId: selectedVisitor.visitorId,
-        recipientProfileId: selectedVisitor.profileId,
-        recipientDisplayName: selectedVisitor.displayName,
+        recipients: selectedVisitors.map((v) => ({
+          recipientVisitorId: v.visitorId,
+          recipientProfileId: v.profileId,
+          recipientDisplayName: v.displayName,
+        })),
         badgeName: selectedBadge,
         comment,
       });
 
-      if (response.data.alreadyOwned) {
-        setErrorMessage(dispatch, `${selectedVisitor.displayName} already has the ${selectedBadge} badge.`);
-      } else {
-        setAwardSuccess({ badgeName: selectedBadge, displayName: selectedVisitor.displayName });
+      const { awarded = [] } = response.data;
+      if (awarded.length > 0) {
+        setAwardSuccess({ badgeName: selectedBadge, displayNames: awarded.join(", ") });
         setTimeout(() => setAwardSuccess(null), 3000);
       }
 
@@ -80,7 +93,7 @@ export const Home = () => {
     } finally {
       setShowAwardModal(false);
       setSelectedBadge(null);
-      setSelectedVisitor(null);
+      setSelectedVisitors([]);
     }
   };
 
@@ -98,7 +111,7 @@ export const Home = () => {
       {awardSuccess && (
         <div className="award-success-banner award-success">
           <p className="p1 text-success">
-            Awarded {awardSuccess.badgeName} to {awardSuccess.displayName}!
+            Awarded {awardSuccess.badgeName} to {awardSuccess.displayNames}!
           </p>
         </div>
       )}
@@ -106,7 +119,12 @@ export const Home = () => {
       {/* Admin Section: Visitor List */}
       {isAdmin && (
         <div className="mb-6">
-          <h3 className="h3 py-3">Current Visitors</h3>
+          <div className="flex items-center justify-between py-3">
+            <h3 className="h3">Current Visitors</h3>
+            <button className="btn btn-icon" onClick={fetchGameState} title="Refresh visitors">
+              &#x21bb;
+            </button>
+          </div>
           <div className="input-group mb-2">
             <input
               className="input"
@@ -125,10 +143,12 @@ export const Home = () => {
                   {filteredVisitors.map((visitor) => (
                     <tr
                       key={visitor.visitorId}
-                      className={`visitor-item ${selectedVisitor?.visitorId === visitor.visitorId ? "selected" : ""}`}
-                      onClick={() => setSelectedVisitor(visitor)}
+                      className={`visitor-item ${selectedVisitors.some((v) => v.visitorId === visitor.visitorId) ? "selected" : ""}`}
+                      onClick={() => toggleVisitor(visitor)}
                     >
-                      <td className="p2">{visitor.displayName}</td>
+                      <td className="p2">
+                        {visitor.displayName} {visitor.isAdmin ? "⭐️" : ""}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -177,16 +197,22 @@ export const Home = () => {
 
       {/* Admin: Award Button */}
       {isAdmin && (
-        <button className="btn mt-4" disabled={!selectedVisitor || !selectedBadge} onClick={handleAwardClick}>
-          Award Badge
-        </button>
+        <PageFooter>
+          <button
+            className="btn mt-4"
+            disabled={selectedVisitors.length === 0 || !selectedBadge}
+            onClick={handleAwardClick}
+          >
+            Award Badge{selectedVisitors.length > 1 ? ` (${selectedVisitors.length})` : ""}
+          </button>
+        </PageFooter>
       )}
 
       {/* Award Confirmation Modal */}
-      {showAwardModal && selectedVisitor && selectedBadge && (
+      {showAwardModal && selectedVisitors.length > 0 && selectedBadge && (
         <AwardBadgeModal
           badgeName={selectedBadge}
-          displayName={selectedVisitor.displayName}
+          displayNames={selectedVisitors.map((v) => v.displayName)}
           onConfirm={handleConfirmAward}
           onCancel={() => setShowAwardModal(false)}
         />

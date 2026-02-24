@@ -28,13 +28,12 @@ export const handleGetGameState = async (req: Request, res: Response) => {
       try {
         const worldActivity = await WorldActivity.create(urlSlug, { credentials });
         const currentVisitors = await worldActivity.currentVisitors(true);
-        responseData.currentVisitors = Object.values(currentVisitors || {})
-          .filter((v: any) => !v.isAdmin)
-          .map((v: any) => ({
-            visitorId: v.visitorId,
-            profileId: v.profileId,
-            displayName: v.displayName || v.username,
-          }));
+        responseData.currentVisitors = Object.values(currentVisitors || {}).map((v: any) => ({
+          visitorId: v.visitorId,
+          profileId: v.profileId,
+          displayName: v.displayName || v.username,
+          isAdmin: v.isAdmin,
+        }));
       } catch (error) {
         errorHandler({
           error,

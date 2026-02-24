@@ -36,10 +36,14 @@ export const awardBadge = async ({
         profileId: recipientProfileId,
         credentials: { ...credentials, profileId: recipientProfileId },
       });
-      const recipientVisitor = await Visitor.create(recipientVisitorId, urlSlug, { credentials });
-
       // Grant the badge
       await recipientUser.grantInventoryItem(inventoryItem, 1);
+    } catch (error) {
+      console.error(standardizeError(error));
+    }
+
+    try {
+      const recipientVisitor = await Visitor.create(recipientVisitorId, urlSlug, { credentials });
 
       // Fire toast to recipient
       recipientVisitor

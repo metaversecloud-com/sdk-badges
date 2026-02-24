@@ -7,27 +7,36 @@ export const handleAwardBadge = async (req: Request, res: Response) => {
     const credentials = getCredentials(req.query);
     const { urlSlug, visitorId } = credentials;
 
+    const { recipients, badgeName, comment } = req.body;
+
     // Admin check
     const visitor: VisitorInterface = await Visitor.get(visitorId, urlSlug, { credentials });
     if (!visitor.isAdmin) {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
-    const { recipientVisitorId, recipientProfileId, badgeName, comment } = req.body;
-
-    if (!recipientVisitorId || !recipientProfileId || !badgeName) {
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0 || !badgeName) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    const result = await awardBadge({
-      credentials,
-      recipientVisitorId: Number(recipientVisitorId),
-      recipientProfileId,
-      badgeName,
-      comment: comment || "",
-    });
+    const awarded: string[] = [];
 
-    return res.json(result);
+    for (const recipient of recipients) {
+      const { recipientVisitorId, recipientProfileId, recipientDisplayName } = recipient;
+      if (!recipientVisitorId || !recipientProfileId) continue;
+
+      await awardBadge({
+        credentials,
+        recipientVisitorId: Number(recipientVisitorId),
+        recipientProfileId,
+        badgeName,
+        comment: comment || "",
+      });
+
+      awarded.push(recipientDisplayName || recipientProfileId);
+    }
+
+    return res.json({ success: true, awarded });
   } catch (error) {
     return errorHandler({
       error,
