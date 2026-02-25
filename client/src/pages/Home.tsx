@@ -130,7 +130,11 @@ export const Home = () => {
               onClick={() => selectable && setSelectedBadge(badge.name)}
             >
               <span className="tooltip-content">{badge.description || badge.name}</span>
-              <img src={badge.icon} alt={badge.name} className={hasBadge ? "" : "badge-img-grayscale"} />
+              <img
+                src={badge.icon}
+                alt={badge.name}
+                className={hasBadge || activeTab === "award" ? "" : "badge-img-grayscale"}
+              />
             </div>
           );
         })}
@@ -158,10 +162,7 @@ export const Home = () => {
           >
             My Badges
           </button>
-          <button
-            className={activeTab === "award" ? "btn" : "btn btn-text"}
-            onClick={() => setActiveTab("award")}
-          >
+          <button className={activeTab === "award" ? "btn" : "btn btn-text"} onClick={() => setActiveTab("award")}>
             Award Badges
           </button>
         </div>
