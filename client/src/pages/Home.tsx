@@ -19,6 +19,7 @@ export const Home = () => {
   const forceRefreshInventory = searchParams.get("forceRefreshInventory") === "true";
 
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"my-badges" | "award">("my-badges");
 
   // Admin-only state
   const [selectedVisitors, setSelectedVisitors] = useState<CurrentVisitor[]>([]);
@@ -100,10 +101,42 @@ export const Home = () => {
   const badgeList = useMemo(() => (badges ? Object.values(badges) : []), [badges]);
 
   const filteredBadges = useMemo(() => {
-    if (!isAdmin || !badgeSearchTerm.trim()) return badgeList;
+    if (!badgeSearchTerm.trim()) return badgeList;
     const term = badgeSearchTerm.toLowerCase();
     return badgeList.filter((b) => b.name.toLowerCase().includes(term));
-  }, [badgeList, badgeSearchTerm, isAdmin]);
+  }, [badgeList, badgeSearchTerm]);
+
+  const badgesGrid = (selectable: boolean) => {
+    const list = selectable ? filteredBadges : badgeList;
+
+    if (list.length === 0) {
+      return (
+        <div className="text-center py-4">
+          <p className="p2 text-muted">No badges available yet.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid badge-grid">
+        {list.map((badge: BadgeType) => {
+          const hasBadge = visitorInventory?.badges && badge.name in visitorInventory.badges;
+          const isSelected = selectable && selectedBadge === badge.name;
+
+          return (
+            <div
+              key={badge.name}
+              className={`tooltip ${selectable ? "selectable" : ""} ${isSelected ? "selected" : ""}`}
+              onClick={() => selectable && setSelectedBadge(badge.name)}
+            >
+              <span className="tooltip-content">{badge.description || badge.name}</span>
+              <img src={badge.icon} alt={badge.name} className={hasBadge ? "" : "badge-img-grayscale"} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <PageContainer isLoading={isLoading} headerText="Badges">
@@ -116,96 +149,94 @@ export const Home = () => {
         </div>
       )}
 
-      {/* Admin Section: Visitor List */}
+      {/* Admin Tabs */}
       {isAdmin && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between py-3">
-            <h3 className="h3">Current Visitors</h3>
-            <button className="btn btn-icon" onClick={fetchGameState} title="Refresh visitors">
-              &#x21bb;
-            </button>
+        <div className="tab-container mb-4">
+          <button
+            className={activeTab === "my-badges" ? "btn" : "btn btn-text"}
+            onClick={() => setActiveTab("my-badges")}
+          >
+            My Badges
+          </button>
+          <button
+            className={activeTab === "award" ? "btn" : "btn btn-text"}
+            onClick={() => setActiveTab("award")}
+          >
+            Award Badges
+          </button>
+        </div>
+      )}
+
+      {/* My Badges Tab (or non-admin default view) */}
+      {(!isAdmin || activeTab === "my-badges") && badgesGrid(false)}
+
+      {/* Award Badges Tab (admin only) */}
+      {isAdmin && activeTab === "award" && (
+        <>
+          {/* Visitor List */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between py-3">
+              <h3 className="h3">Current Visitors</h3>
+              <button className="btn btn-icon" onClick={fetchGameState} title="Refresh visitors">
+                &#x21bb;
+              </button>
+            </div>
+            <div className="input-group mb-2">
+              <input
+                className="input"
+                type="text"
+                placeholder="Search visitors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+              {filteredVisitors.length === 0 ? (
+                <p className="p3 text-muted text-center">No visitors found.</p>
+              ) : (
+                <table className="table">
+                  <tbody>
+                    {filteredVisitors.map((visitor) => (
+                      <tr
+                        key={visitor.visitorId}
+                        className={`visitor-item ${selectedVisitors.some((v) => v.visitorId === visitor.visitorId) ? "selected" : ""}`}
+                        onClick={() => toggleVisitor(visitor)}
+                      >
+                        <td className="p2">
+                          {visitor.displayName} {visitor.isAdmin ? "⭐️" : ""}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
+
+          {/* Badge Selection */}
+          <h3 className="h3 py-3">Select a Badge to Award</h3>
           <div className="input-group mb-2">
             <input
               className="input"
               type="text"
-              placeholder="Search visitors..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search badges..."
+              value={badgeSearchTerm}
+              onChange={(e) => setBadgeSearchTerm(e.target.value)}
             />
           </div>
-          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
-            {filteredVisitors.length === 0 ? (
-              <p className="p3 text-muted text-center">No visitors found.</p>
-            ) : (
-              <table className="table">
-                <tbody>
-                  {filteredVisitors.map((visitor) => (
-                    <tr
-                      key={visitor.visitorId}
-                      className={`visitor-item ${selectedVisitors.some((v) => v.visitorId === visitor.visitorId) ? "selected" : ""}`}
-                      onClick={() => toggleVisitor(visitor)}
-                    >
-                      <td className="p2">
-                        {visitor.displayName} {visitor.isAdmin ? "⭐️" : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
+          {badgesGrid(true)}
 
-      {/* Badges Grid */}
-      <h3 className="h3 py-3">{isAdmin ? "Select a Badge to Award" : ""}</h3>
-      {isAdmin && (
-        <div className="input-group mb-2">
-          <input
-            className="input"
-            type="text"
-            placeholder="Search badges..."
-            value={badgeSearchTerm}
-            onChange={(e) => setBadgeSearchTerm(e.target.value)}
-          />
-        </div>
-      )}
-      {filteredBadges.length === 0 ? (
-        <div className="text-center py-4">
-          <p className="p2 text-muted">No badges available yet.</p>
-        </div>
-      ) : (
-        <div className="grid badge-grid">
-          {filteredBadges.map((badge: BadgeType) => {
-            const hasBadge = visitorInventory?.badges && badge.name in visitorInventory.badges;
-            const isSelected = isAdmin && selectedBadge === badge.name;
-
-            return (
-              <div
-                key={badge.name}
-                className={`tooltip ${isAdmin ? "selectable" : ""} ${isSelected ? "selected" : ""}`}
-                onClick={() => isAdmin && setSelectedBadge(badge.name)}
-              >
-                <span className="tooltip-content">{badge.description || badge.name}</span>
-                <img src={badge.icon} alt={badge.name} className={hasBadge || isAdmin ? "" : "badge-img-grayscale"} />
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Admin: Award Button */}
-      {isAdmin && (
-        <PageFooter>
-          <button
-            className="btn mt-4"
-            disabled={selectedVisitors.length === 0 || !selectedBadge}
-            onClick={handleAwardClick}
-          >
-            Award Badge{selectedVisitors.length > 1 ? ` (${selectedVisitors.length})` : ""}
-          </button>
-        </PageFooter>
+          {/* Award Button */}
+          <PageFooter>
+            <button
+              className="btn mt-4"
+              disabled={selectedVisitors.length === 0 || !selectedBadge}
+              onClick={handleAwardClick}
+            >
+              Award Badge{selectedVisitors.length > 1 ? ` (${selectedVisitors.length})` : ""}
+            </button>
+          </PageFooter>
+        </>
       )}
 
       {/* Award Confirmation Modal */}
