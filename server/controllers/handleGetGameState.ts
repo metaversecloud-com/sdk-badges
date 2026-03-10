@@ -1,60 +1,55 @@
 import { Request, Response } from "express";
-import { errorHandler, getCredentials, getDroppedAsset, Visitor, World } from "../utils/index.js";
 import { VisitorInterface } from "@rtsdk/topia";
-import axios from "axios";
+import { errorHandler, getCredentials, getBadges, getVisitorBadges, Visitor, WorldActivity } from "../utils/index.js";
 
 export const handleGetGameState = async (req: Request, res: Response) => {
   try {
     const credentials = getCredentials(req.query);
-    const { assetId, displayName, interactiveNonce, interactivePublicKey, profileId, urlSlug, visitorId } = credentials;
+    const { urlSlug, visitorId } = credentials;
+    const forceRefresh = req.query.forceRefreshInventory === "true";
 
-    const droppedAsset = await getDroppedAsset(credentials);
-
-    const world = World.create(urlSlug, { credentials });
-    world.triggerParticle({ name: "Sparkle", duration: 3, position: droppedAsset.position }).catch((error: any) =>
-      errorHandler({
-        error,
-        functionName: "handleGetGameState",
-        message: "Error triggering particle effects",
-      }),
-    );
-
+    // Fetch visitor for admin status
     const visitor: VisitorInterface = await Visitor.get(visitorId, urlSlug, { credentials });
     const { isAdmin } = visitor;
 
-    try {
-      await axios.post(
-        `${process.env.LEADERBOARD_BASE_URL || "http://v2lboard0-prod-topia.topia-rtsdk.com"}/api/dropped-asset/increment-player-stats?assetId=${assetId}&displayName=${displayName}&interactiveNonce=${interactiveNonce}&interactivePublicKey=${interactivePublicKey}&profileId=${profileId}&urlSlug=${urlSlug}&visitorId=${visitorId}`,
-        {
-          publicKey: interactivePublicKey,
-          secret: process.env.INTERACTIVE_SECRET,
-          profileId,
-          displayName,
-          incrementBy: 1,
-        },
-      );
-    } catch (error) {
-      errorHandler({
-        error,
-        functionName: "handleGetGameState",
-        message: "Error posting player stats to Leaderboard",
-      });
+    // Fetch badges and visitor inventory in parallel
+    const [badges] = await Promise.all([getBadges(credentials, forceRefresh), visitor.fetchInventoryItems()]);
+    const visitorInventory = getVisitorBadges(visitor.inventoryItems);
+
+    const responseData: Record<string, any> = {
+      success: true,
+      isAdmin,
+      badges,
+      visitorInventory,
+    };
+
+    // Admin-only: fetch current visitors in the world
+    if (isAdmin) {
+      try {
+        const worldActivity = await WorldActivity.create(urlSlug, { credentials });
+        const currentVisitors = await worldActivity.currentVisitors(true);
+        responseData.currentVisitors = Object.values(currentVisitors || {}).map((v: any) => ({
+          visitorId: v.visitorId,
+          profileId: v.profileId,
+          displayName: v.displayName || v.username,
+          isAdmin: v.isAdmin,
+        }));
+      } catch (error) {
+        errorHandler({
+          error,
+          functionName: "handleGetGameState",
+          message: "Error fetching current visitors",
+        });
+        responseData.currentVisitors = [];
+      }
     }
 
-    await world.fireToast({ title: "Nice Work!", text: "You've successfully completed the task!" }).catch((error) =>
-      errorHandler({
-        error,
-        functionName: "handleGetGameState",
-        message: "Error firing toast in world",
-      }),
-    );
-
-    return res.json({ droppedAsset, isAdmin, success: true });
+    return res.json(responseData);
   } catch (error) {
     return errorHandler({
       error,
-      functionName: "getDroppedAssetDetails",
-      message: "Error getting dropped asset instance and data object",
+      functionName: "handleGetGameState",
+      message: "Error loading game state",
       req,
       res,
     });

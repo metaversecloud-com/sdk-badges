@@ -1,7 +1,10 @@
 /**
- * Shared types between client and server for visitor data
+ * Shared types between client and server for visitor data.
+ * Stored on the admin's visitor data object to track badge awards.
  */
 
 export interface VisitorDataObject {
-  exampleParam: string;
+  awardHistory?: {
+    [badgeName: string]: string[];
+  };
 }

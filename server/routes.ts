@@ -1,5 +1,5 @@
 import express from "express";
-import { handleGetGameState } from "./controllers/index.js";
+import { handleAwardBadge, handleGetGameState } from "./controllers/index.js";
 import { getVersion } from "./utils/getVersion.js";
 
 const router = express.Router();
@@ -24,5 +24,6 @@ router.get("/system/health", (req, res) => {
 });
 
 router.get("/game-state", handleGetGameState);
+router.post("/award-badge", handleAwardBadge);
 
 export default router;

@@ -2,7 +2,6 @@ const topiaMock = require("../mocks/@rtsdk/topia").__mock;
 
 import express from "express";
 import request from "supertest";
-import axios from "axios";
 
 import router from "../routes.js";
 
@@ -21,24 +20,34 @@ const baseCreds = {
   urlSlug: "my-world",
 };
 
-// Mock axios for external API calls
-jest.mock("axios");
-const mockedAxios = jest.mocked(axios);
-
 // Mock the utils
 jest.mock("../utils/index.js", () => ({
   errorHandler: jest.fn(),
   getCredentials: jest.fn(),
-  getDroppedAsset: jest.fn(),
+  getBadges: jest.fn(),
+  getVisitorBadges: jest.fn(),
+  awardBadge: jest.fn(),
   Visitor: {
     get: jest.fn(),
+    create: jest.fn(),
   },
-  World: {
+  WorldActivity: {
     create: jest.fn(),
   },
 }));
 
 const mockUtils = jest.mocked(require("../utils/index.js"));
+
+const mockBadges = {
+  "Hard Worker": { id: "badge-1", name: "Hard Worker", icon: "https://example.com/hw.png", description: "Works hard" },
+  Explorer: { id: "badge-2", name: "Explorer", icon: "https://example.com/ex.png", description: "Explores things" },
+};
+
+const mockVisitorInventory = {
+  badges: {
+    "Hard Worker": { id: "badge-1", name: "Hard Worker", icon: "https://example.com/hw.png" },
+  },
+};
 
 describe("routes", () => {
   beforeEach(() => {
@@ -48,7 +57,7 @@ describe("routes", () => {
 
   test("GET /system/health returns status OK and env keys", async () => {
     const app = makeApp();
-    let res = await request(app).get("/api/system/health");
+    const res = await request(app).get("/api/system/health");
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("status", "OK");
@@ -56,86 +65,281 @@ describe("routes", () => {
     expect(res.body.envs).toHaveProperty("NODE_ENV");
   });
 
-  test("GET /game-state returns game state with dropped asset and admin status", async () => {
-    const mockDroppedAsset = {
-      id: "dropped-asset-123",
-      position: { x: 100, y: 200 },
-      name: "Test Asset"
-    };
+  describe("GET /game-state", () => {
+    test("returns badges and visitor inventory for non-admin", async () => {
+      const mockVisitor = {
+        isAdmin: false,
+        inventoryItems: [{ id: "badge-1", name: "Hard Worker", type: "BADGE", status: "ACTIVE" }],
+        fetchInventoryItems: jest.fn().mockResolvedValue(undefined),
+      };
 
-    const mockVisitor = {
-      isAdmin: true,
-      id: 1
-    };
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.getBadges.mockResolvedValue(mockBadges);
+      mockUtils.getVisitorBadges.mockReturnValue(mockVisitorInventory);
 
-    const mockWorld = {
-      triggerParticle: jest.fn().mockResolvedValue({}),
-      fireToast: jest.fn().mockResolvedValue({})
-    };
+      const app = makeApp();
+      const res = await request(app).get("/api/game-state").query(baseCreds);
 
-    // Setup mocks
-    mockUtils.getCredentials.mockReturnValue(baseCreds);
-    mockUtils.getDroppedAsset.mockResolvedValue(mockDroppedAsset);
-    mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
-    mockUtils.World.create.mockReturnValue(mockWorld);
-    mockedAxios.post.mockResolvedValue({ data: { success: true } });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        success: true,
+        isAdmin: false,
+        badges: mockBadges,
+        visitorInventory: mockVisitorInventory,
+      });
 
-    const app = makeApp();
-    const res = await request(app)
-      .get("/api/game-state")
-      .query(baseCreds);
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("success", true);
-    expect(res.body).toHaveProperty("droppedAsset", mockDroppedAsset);
-    expect(res.body).toHaveProperty("isAdmin", true);
-
-    // Verify mocks were called correctly
-    expect(mockUtils.getCredentials).toHaveBeenCalledWith(expect.objectContaining({
-      assetId: "asset-123",
-      interactiveNonce: "nonce-xyz",
-      urlSlug: "my-world",
-      visitorId: "1" // Query params come as strings
-    }));
-    expect(mockUtils.getDroppedAsset).toHaveBeenCalledWith(baseCreds);
-    expect(mockUtils.Visitor.get).toHaveBeenCalledWith(baseCreds.visitorId, baseCreds.urlSlug, { credentials: baseCreds });
-    expect(mockUtils.World.create).toHaveBeenCalledWith(baseCreds.urlSlug, { credentials: baseCreds });
-    expect(mockWorld.triggerParticle).toHaveBeenCalledWith({
-      name: "Sparkle",
-      duration: 3,
-      position: mockDroppedAsset.position
+      expect(mockUtils.Visitor.get).toHaveBeenCalledWith(baseCreds.visitorId, baseCreds.urlSlug, { credentials: baseCreds });
+      expect(mockUtils.getBadges).toHaveBeenCalledWith(baseCreds);
+      expect(mockVisitor.fetchInventoryItems).toHaveBeenCalled();
+      expect(mockUtils.getVisitorBadges).toHaveBeenCalledWith(mockVisitor.inventoryItems);
+      expect(mockUtils.WorldActivity.create).not.toHaveBeenCalled();
     });
-    expect(mockWorld.fireToast).toHaveBeenCalledWith({
-      title: "You've leveled up!",
-      text: "Congratulations! You've reached a new level."
+
+    test("returns currentVisitors for admin", async () => {
+      const mockVisitor = {
+        isAdmin: true,
+        inventoryItems: [],
+        fetchInventoryItems: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const mockCurrentVisitors = {
+        v1: { visitorId: 10, profileId: "p10", displayName: "Alice", isAdmin: false },
+        v2: { visitorId: 20, profileId: "p20", displayName: "Bob", isAdmin: false },
+      };
+
+      const mockWorldActivity = {
+        currentVisitors: jest.fn().mockResolvedValue(mockCurrentVisitors),
+      };
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.getBadges.mockResolvedValue(mockBadges);
+      mockUtils.getVisitorBadges.mockReturnValue({ badges: {} });
+      mockUtils.WorldActivity.create.mockResolvedValue(mockWorldActivity);
+
+      const app = makeApp();
+      const res = await request(app).get("/api/game-state").query(baseCreds);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.isAdmin).toBe(true);
+      expect(res.body.currentVisitors).toEqual([
+        { visitorId: 10, profileId: "p10", displayName: "Alice" },
+        { visitorId: 20, profileId: "p20", displayName: "Bob" },
+      ]);
+
+      expect(mockUtils.WorldActivity.create).toHaveBeenCalledWith(baseCreds.urlSlug, { credentials: baseCreds });
+      expect(mockWorldActivity.currentVisitors).toHaveBeenCalledWith(true);
+    });
+
+    test("filters out admin visitors from currentVisitors", async () => {
+      const mockVisitor = {
+        isAdmin: true,
+        inventoryItems: [],
+        fetchInventoryItems: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const mockCurrentVisitors = {
+        v1: { visitorId: 10, profileId: "p10", displayName: "Alice", isAdmin: false },
+        v2: { visitorId: 20, profileId: "p20", displayName: "AdminUser", isAdmin: true },
+        v3: { visitorId: 30, profileId: "p30", displayName: "Charlie", isAdmin: false },
+      };
+
+      const mockWorldActivity = {
+        currentVisitors: jest.fn().mockResolvedValue(mockCurrentVisitors),
+      };
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.getBadges.mockResolvedValue(mockBadges);
+      mockUtils.getVisitorBadges.mockReturnValue({ badges: {} });
+      mockUtils.WorldActivity.create.mockResolvedValue(mockWorldActivity);
+
+      const app = makeApp();
+      const res = await request(app).get("/api/game-state").query(baseCreds);
+
+      expect(res.body.currentVisitors).toHaveLength(2);
+      expect(res.body.currentVisitors.map((v: any) => v.displayName)).toEqual(["Alice", "Charlie"]);
+    });
+
+    test("falls back to username when displayName is missing", async () => {
+      const mockVisitor = {
+        isAdmin: true,
+        inventoryItems: [],
+        fetchInventoryItems: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const mockCurrentVisitors = {
+        v1: { visitorId: 10, profileId: "p10", displayName: "", username: "alice99", isAdmin: false },
+        v2: { visitorId: 20, profileId: "p20", username: "bob42", isAdmin: false },
+      };
+
+      const mockWorldActivity = {
+        currentVisitors: jest.fn().mockResolvedValue(mockCurrentVisitors),
+      };
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.getBadges.mockResolvedValue(mockBadges);
+      mockUtils.getVisitorBadges.mockReturnValue({ badges: {} });
+      mockUtils.WorldActivity.create.mockResolvedValue(mockWorldActivity);
+
+      const app = makeApp();
+      const res = await request(app).get("/api/game-state").query(baseCreds);
+
+      expect(res.body.currentVisitors).toEqual([
+        { visitorId: 10, profileId: "p10", displayName: "alice99" },
+        { visitorId: 20, profileId: "p20", displayName: "bob42" },
+      ]);
+    });
+
+    test("returns empty currentVisitors when WorldActivity fails", async () => {
+      const mockVisitor = {
+        isAdmin: true,
+        inventoryItems: [],
+        fetchInventoryItems: jest.fn().mockResolvedValue(undefined),
+      };
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.getBadges.mockResolvedValue(mockBadges);
+      mockUtils.getVisitorBadges.mockReturnValue({ badges: {} });
+      mockUtils.WorldActivity.create.mockRejectedValue(new Error("WorldActivity error"));
+
+      const app = makeApp();
+      const res = await request(app).get("/api/game-state").query(baseCreds);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.currentVisitors).toEqual([]);
+    });
+
+    test("calls errorHandler when credentials fail", async () => {
+      const mockError = new Error("Missing credentials");
+
+      mockUtils.getCredentials.mockImplementation(() => {
+        throw mockError;
+      });
+      mockUtils.errorHandler.mockImplementation(({ res }: any) => {
+        if (res) return res.status(500).json({ error: "Internal server error" });
+      });
+
+      const app = makeApp();
+      await request(app).get("/api/game-state").query(baseCreds);
+
+      expect(mockUtils.errorHandler).toHaveBeenCalledWith({
+        error: mockError,
+        functionName: "handleGetGameState",
+        message: "Error loading game state",
+        req: expect.any(Object),
+        res: expect.any(Object),
+      });
     });
   });
 
-  test("GET /game-state handles errors when getDroppedAsset fails", async () => {
-    const mockError = new Error("Asset not found");
+  describe("POST /award-badge", () => {
+    const awardBody = {
+      recipientVisitorId: 10,
+      recipientProfileId: "profile-10",
+      badgeName: "Hard Worker",
+      comment: "Great job!",
+    };
 
-    mockUtils.getCredentials.mockReturnValue(baseCreds);
-    mockUtils.getDroppedAsset.mockResolvedValue(mockError);
+    test("awards badge successfully for admin", async () => {
+      const mockVisitor = { isAdmin: true };
 
-    // Mock errorHandler to actually call res.status().json() to end the response
-    mockUtils.errorHandler.mockImplementation(({ res }: any) => {
-      if (res) {
-        return res.status(500).json({ error: "Internal server error" });
-      }
-      return { status: 500, message: "error" };
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.awardBadge.mockResolvedValue({ success: true });
+
+      const app = makeApp();
+      const res = await request(app).post("/api/award-badge").query(baseCreds).send(awardBody);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ success: true });
+
+      expect(mockUtils.awardBadge).toHaveBeenCalledWith({
+        credentials: baseCreds,
+        recipientVisitorId: 10,
+        recipientProfileId: "profile-10",
+        badgeName: "Hard Worker",
+        comment: "Great job!",
+      });
     });
 
-    const app = makeApp();
-    await request(app)
-      .get("/api/game-state")
-      .query(baseCreds);
+    test("returns 403 when visitor is not admin", async () => {
+      const mockVisitor = { isAdmin: false };
 
-    expect(mockUtils.errorHandler).toHaveBeenCalledWith({
-      error: mockError,
-      functionName: "getDroppedAssetDetails",
-      message: "Error getting dropped asset instance and data object",
-      req: expect.any(Object),
-      res: expect.any(Object)
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+
+      const app = makeApp();
+      const res = await request(app).post("/api/award-badge").query(baseCreds).send(awardBody);
+
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ success: false, message: "Admin access required" });
+      expect(mockUtils.awardBadge).not.toHaveBeenCalled();
     });
-  }, 30000);
+
+    test("returns 400 when required fields are missing", async () => {
+      const mockVisitor = { isAdmin: true };
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+
+      const app = makeApp();
+
+      const res = await request(app)
+        .post("/api/award-badge")
+        .query(baseCreds)
+        .send({ recipientVisitorId: 10 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ success: false, message: "Missing required fields" });
+      expect(mockUtils.awardBadge).not.toHaveBeenCalled();
+    });
+
+    test("defaults comment to empty string", async () => {
+      const mockVisitor = { isAdmin: true };
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.awardBadge.mockResolvedValue({ success: true });
+
+      const app = makeApp();
+      const res = await request(app)
+        .post("/api/award-badge")
+        .query(baseCreds)
+        .send({ recipientVisitorId: 10, recipientProfileId: "p10", badgeName: "Explorer" });
+
+      expect(res.status).toBe(200);
+      expect(mockUtils.awardBadge).toHaveBeenCalledWith(
+        expect.objectContaining({ comment: "" }),
+      );
+    });
+
+    test("calls errorHandler when awardBadge throws", async () => {
+      const mockVisitor = { isAdmin: true };
+      const mockError = new Error("Award failed");
+
+      mockUtils.getCredentials.mockReturnValue(baseCreds);
+      mockUtils.Visitor.get.mockResolvedValue(mockVisitor);
+      mockUtils.awardBadge.mockRejectedValue(mockError);
+      mockUtils.errorHandler.mockImplementation(({ res }: any) => {
+        if (res) return res.status(500).json({ error: "Internal server error" });
+      });
+
+      const app = makeApp();
+      await request(app).post("/api/award-badge").query(baseCreds).send(awardBody);
+
+      expect(mockUtils.errorHandler).toHaveBeenCalledWith({
+        error: mockError,
+        functionName: "handleAwardBadge",
+        message: "Error awarding badge",
+        req: expect.any(Object),
+        res: expect.any(Object),
+      });
+    });
+  });
 });
