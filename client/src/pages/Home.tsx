@@ -227,6 +227,10 @@ export const Home = () => {
           </div>
           {badgesGrid(true)}
 
+          <a href="https://form.typeform.com/to/zn46Zs78" target="_blank" rel="noopener noreferrer" className="block my-6 text-sm text-blue-500">
+            Request a new badge
+          </a>
+
           {/* Award Button */}
           <PageFooter>
             <button
