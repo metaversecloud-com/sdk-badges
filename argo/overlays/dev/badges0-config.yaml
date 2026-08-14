@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: badges0-config
+  labels:
+    app.kubernetes.io/name: badges0
+data:
+  INSTANCE_DOMAIN: 'api.topia.io'
+  INSTANCE_PROTOCOL: 'https'
+  INTERACTIVE_KEY: 'ZirmSk5ClIu4tU3NMv9U'
+  NODE_ENV: 'production'
+  PORT: '3000'

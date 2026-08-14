@@ -1,4 +1,4 @@
-FROM node:20.10-alpine3.19
+FROM node:22-alpine
 WORKDIR /app
 ADD server ./server
 ADD client ./client
