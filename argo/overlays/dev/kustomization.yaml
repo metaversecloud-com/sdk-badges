@@ -26,5 +26,5 @@ patches:
 images:
   - name: badges0
     newName: 368076259134.dkr.ecr.us-east-1.amazonaws.com/sdk-example
-    digest: sha256:7ff077249e3a2b889c6118409323b97c621c041cfa7e35905b95a0dfa0d88f36
+    digest: sha256:700c1040c0db6ea3df456796b835790cb7221f5e96f08ad36f3c338a10483617
     newTag: sdk-badges
