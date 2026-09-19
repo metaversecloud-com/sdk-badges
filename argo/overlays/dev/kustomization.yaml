@@ -8,7 +8,6 @@ resources:
   - badges0-config.yaml
   - badges0-sealedsecret.yaml
   - badges0-httpscaledobject.yaml
-  - badges0-interceptor-ingress.yaml
 patches:
   # Drop the direct ALB Ingress: in dev the app is fronted through the KEDA
   # interceptor so a scaled-to-zero Deployment is woken by the first request.
