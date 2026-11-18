@@ -1,0 +1,58 @@
+[
+  {
+    "id": "badge-1",
+    "name": "Perfect Score",
+    "type": "BADGE",
+    "status": "ACTIVE",
+    "description": "Perfect Score badge",
+    "image_path": "https://example.invalid/badges/1.png"
+  },
+  {
+    "id": "badge-2",
+    "name": "Lightning Round",
+    "type": "BADGE",
+    "status": "ACTIVE",
+    "description": "Lightning Round badge",
+    "image_path": "https://example.invalid/badges/2.png"
+  },
+  {
+    "id": "badge-3",
+    "name": "Quiz Master",
+    "type": "BADGE",
+    "status": "ACTIVE",
+    "description": "Quiz Master badge",
+    "image_path": "https://example.invalid/badges/3.png"
+  },
+  {
+    "id": "badge-4",
+    "name": "Top 3 Finisher",
+    "type": "BADGE",
+    "status": "ACTIVE",
+    "description": "Top 3 Finisher badge",
+    "image_path": "https://example.invalid/badges/4.png"
+  },
+  {
+    "id": "badge-retired",
+    "name": "Retired Badge",
+    "type": "BADGE",
+    "status": "INACTIVE",
+    "description": "Retired Badge badge",
+    "image_path": "https://example.invalid/badges/retired.png"
+  },
+  {
+    "id": "item-coin",
+    "name": "Gold Coin",
+    "type": "ITEM",
+    "status": "ACTIVE",
+    "description": "A coin",
+    "image_path": "https://example.invalid/items/coin.png"
+  },
+  {
+    "id": "badge-dot",
+    "name": "Level 2.0",
+    "type": "BADGE",
+    "status": "ACTIVE",
+    "description": "Level 2.0 badge",
+    "image_path": "https://example.invalid/badges/dot.png"
+  }
+]
