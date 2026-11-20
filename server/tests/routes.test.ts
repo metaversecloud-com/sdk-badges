@@ -90,7 +90,7 @@ describe("routes", () => {
       });
 
       expect(mockUtils.Visitor.get).toHaveBeenCalledWith(baseCreds.visitorId, baseCreds.urlSlug, { credentials: baseCreds });
-      expect(mockUtils.getBadges).toHaveBeenCalledWith(baseCreds);
+      expect(mockUtils.getBadges).toHaveBeenCalledWith(baseCreds, false);
       expect(mockVisitor.fetchInventoryItems).toHaveBeenCalled();
       expect(mockUtils.getVisitorBadges).toHaveBeenCalledWith(mockVisitor.inventoryItems);
       expect(mockUtils.WorldActivity.create).not.toHaveBeenCalled();
@@ -125,15 +125,15 @@ describe("routes", () => {
       expect(res.body.success).toBe(true);
       expect(res.body.isAdmin).toBe(true);
       expect(res.body.currentVisitors).toEqual([
-        { visitorId: 10, profileId: "p10", displayName: "Alice" },
-        { visitorId: 20, profileId: "p20", displayName: "Bob" },
+        { visitorId: 10, profileId: "p10", displayName: "Alice", isAdmin: false },
+        { visitorId: 20, profileId: "p20", displayName: "Bob", isAdmin: false },
       ]);
 
       expect(mockUtils.WorldActivity.create).toHaveBeenCalledWith(baseCreds.urlSlug, { credentials: baseCreds });
       expect(mockWorldActivity.currentVisitors).toHaveBeenCalledWith(true);
     });
 
-    test("filters out admin visitors from currentVisitors", async () => {
+    test("lists admin visitors too, flagged with isAdmin", async () => {
       const mockVisitor = {
         isAdmin: true,
         inventoryItems: [],
@@ -159,8 +159,11 @@ describe("routes", () => {
       const app = makeApp();
       const res = await request(app).get("/api/game-state").query(baseCreds);
 
-      expect(res.body.currentVisitors).toHaveLength(2);
-      expect(res.body.currentVisitors.map((v: any) => v.displayName)).toEqual(["Alice", "Charlie"]);
+      expect(res.body.currentVisitors.map((v: any) => [v.displayName, v.isAdmin])).toEqual([
+        ["Alice", false],
+        ["AdminUser", true],
+        ["Charlie", false],
+      ]);
     });
 
     test("falls back to username when displayName is missing", async () => {
@@ -189,8 +192,8 @@ describe("routes", () => {
       const res = await request(app).get("/api/game-state").query(baseCreds);
 
       expect(res.body.currentVisitors).toEqual([
-        { visitorId: 10, profileId: "p10", displayName: "alice99" },
-        { visitorId: 20, profileId: "p20", displayName: "bob42" },
+        { visitorId: 10, profileId: "p10", displayName: "alice99", isAdmin: false },
+        { visitorId: 20, profileId: "p20", displayName: "bob42", isAdmin: false },
       ]);
     });
 
@@ -240,8 +243,7 @@ describe("routes", () => {
 
   describe("POST /award-badge", () => {
     const awardBody = {
-      recipientVisitorId: 10,
-      recipientProfileId: "profile-10",
+      recipients: [{ recipientVisitorId: 10, recipientProfileId: "profile-10", recipientDisplayName: "Alice" }],
       badgeName: "Hard Worker",
       comment: "Great job!",
     };
@@ -257,7 +259,7 @@ describe("routes", () => {
       const res = await request(app).post("/api/award-badge").query(baseCreds).send(awardBody);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ success: true });
+      expect(res.body).toEqual({ success: true, awarded: ["Alice"] });
 
       expect(mockUtils.awardBadge).toHaveBeenCalledWith({
         credentials: baseCreds,
@@ -311,7 +313,7 @@ describe("routes", () => {
       const res = await request(app)
         .post("/api/award-badge")
         .query(baseCreds)
-        .send({ recipientVisitorId: 10, recipientProfileId: "p10", badgeName: "Explorer" });
+        .send({ recipients: [{ recipientVisitorId: 10, recipientProfileId: "p10" }], badgeName: "Explorer" });
 
       expect(res.status).toBe(200);
       expect(mockUtils.awardBadge).toHaveBeenCalledWith(
